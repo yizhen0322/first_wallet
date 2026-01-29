@@ -7,6 +7,7 @@ import '../../../shared/theme/app_theme.dart';
 import '../../activity/data/token_balance_provider.dart';
 import '../data/address_book_repository.dart';
 import 'address_book_screen.dart';
+import 'qr_scanner_screen.dart';
 import 'send_token_confirm_screen.dart';
 
 class SendTokenScreen extends ConsumerStatefulWidget {
@@ -148,6 +149,13 @@ class _SendTokenScreenState extends ConsumerState<SendTokenScreen> {
                       onPressed: _selectFromAddressBook,
                     ),
                     IconButton(
+                      icon: const Icon(
+                        Icons.qr_code_scanner_outlined,
+                        color: AppColors.textSecondary,
+                      ),
+                      onPressed: _scanQr,
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.content_paste,
                           color: AppColors.textSecondary),
                       onPressed: _pasteFromClipboard,
@@ -200,6 +208,14 @@ class _SendTokenScreenState extends ConsumerState<SendTokenScreen> {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (!mounted || data?.text == null) return;
     _toCtrl.text = data!.text!.trim();
+  }
+
+  Future<void> _scanQr() async {
+    final scanned = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const QrScannerScreen()),
+    );
+    if (!mounted || scanned == null) return;
+    _toCtrl.text = scanned;
   }
 
   Future<void> _onNext() async {

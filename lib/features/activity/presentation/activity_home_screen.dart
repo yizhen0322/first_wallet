@@ -6,6 +6,7 @@ import '../../../shared/contracts/app_contracts.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../data/transaction_history_provider.dart';
 import '../data/token_balance_provider.dart';
+import 'transaction_details_screen.dart';
 
 class ActivityHomeScreen extends ConsumerStatefulWidget {
   const ActivityHomeScreen({super.key});
@@ -202,7 +203,17 @@ class _TransactionsTab extends ConsumerWidget {
             ),
             itemBuilder: (context, index) {
               final tx = transactions[index];
-              return _TransactionTile(tx: tx);
+              return _TransactionTile(
+                tx: tx,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => TransactionDetailsScreen(
+                      transaction: tx,
+                      isSepolia: network.chainId == 11155111,
+                    ),
+                  ),
+                ),
+              );
             },
           ),
         );
@@ -212,83 +223,91 @@ class _TransactionsTab extends ConsumerWidget {
 }
 
 class _TransactionTile extends StatelessWidget {
-  const _TransactionTile({required this.tx});
+  const _TransactionTile({required this.tx, this.onTap});
 
   final TransactionRecord tx;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('MMM d, yyyy');
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          // Direction icon
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: tx.isIncoming
-                  ? AppColors.success.withValues(alpha: 38)
-                  : AppColors.error.withValues(alpha: 38),
-              borderRadius: BorderRadius.circular(20),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            // Direction icon
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tx.isIncoming
+                    ? AppColors.success.withValues(alpha: 38)
+                    : AppColors.error.withValues(alpha: 38),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                tx.isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
+                color: tx.isIncoming ? AppColors.success : AppColors.error,
+                size: 20,
+              ),
             ),
-            child: Icon(
-              tx.isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
-              color: tx.isIncoming ? AppColors.success : AppColors.error,
-              size: 20,
+            const SizedBox(width: 12),
+            // Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tx.isIncoming ? 'Received' : 'Sent',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tx.isIncoming
+                        ? 'From: ${tx.shortFrom}'
+                        : 'To: ${tx.shortTo}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Details
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // Amount and date
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  tx.isIncoming ? 'Received' : 'Sent',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 15,
+                  '${tx.isIncoming ? '+' : '-'}${tx.valueInEth} ETH',
+                  style: TextStyle(
+                    color: tx.isIncoming
+                        ? AppColors.success
+                        : AppColors.textPrimary,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  tx.isIncoming ? 'From: ${tx.shortFrom}' : 'To: ${tx.shortTo}',
+                  dateFormat.format(tx.timeStamp),
                   style: const TextStyle(
                     color: AppColors.textSecondary,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
-          ),
-          // Amount and date
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${tx.isIncoming ? '+' : '-'}${tx.valueInEth} ETH',
-                style: TextStyle(
-                  color:
-                      tx.isIncoming ? AppColors.success : AppColors.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                dateFormat.format(tx.timeStamp),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

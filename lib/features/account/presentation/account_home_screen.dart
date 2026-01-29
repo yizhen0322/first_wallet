@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/router.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../auth/state/auth_controller.dart';
+import '../../wallet/presentation/address_book_screen.dart';
 
 class AccountHomeScreen extends ConsumerWidget {
   const AccountHomeScreen({super.key});
@@ -79,6 +80,22 @@ class AccountHomeScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.contacts_outlined,
+                        color: AppColors.textPrimary),
+                    title: const Text(
+                      'Address Book',
+                      style: TextStyle(color: AppColors.textPrimary),
+                    ),
+                    trailing: const Icon(Icons.chevron_right,
+                        color: AppColors.textSecondary),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AddressBookScreen(),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.border),
                   ListTile(
                     leading: const Icon(Icons.support_agent,
                         color: AppColors.textPrimary),
