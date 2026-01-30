@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/contracts/app_contracts.dart';
 import '../../../shared/theme/app_theme.dart';
+import '../../../shared/utils/local_auth_gate.dart';
 import '../../../shared/widgets/risk_of_copy_dialog.dart';
 import '../../../shared/widgets/security_warning_banner.dart';
 import '../state/wallet_secrets.dart';
@@ -20,11 +21,31 @@ class EvmPrivateKeyScreen extends ConsumerStatefulWidget {
 class _EvmPrivateKeyScreenState extends ConsumerState<EvmPrivateKeyScreen> {
   bool _rehydrating = false;
   String? _rehydrateAttemptForId;
+  bool _unlocked = false;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_tryRehydrateIfNeeded);
+    Future.microtask(() async {
+      final available = await LocalAuthGate.isAvailable();
+      if (!mounted) return;
+      if (!available) setState(() => _unlocked = true);
+    });
+  }
+
+  Future<void> _unlock() async {
+    final ok = await LocalAuthGate.authenticate(
+      reason: 'Authenticate to view your private key',
+    );
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Authentication cancelled')),
+      );
+      return;
+    }
+    setState(() => _unlocked = true);
   }
 
   Future<void> _tryRehydrateIfNeeded() async {
@@ -77,7 +98,49 @@ class _EvmPrivateKeyScreenState extends ConsumerState<EvmPrivateKeyScreen> {
                         style: TextStyle(color: AppColors.textPrimary),
                       ),
               )
-            : FutureBuilder<String>(
+            : !_unlocked
+                ? Padding(
+                    padding: const EdgeInsets.all(28),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SecurityWarningBanner(
+                          text:
+                              'Never share this key with anyone.\nPavilion support team will never ask for it',
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'This is sensitive information.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _unlock,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.black,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Unlock to view',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : FutureBuilder<String>(
                 future: engine.getPrivateKey(mnemonic: mnemonic),
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {

@@ -5,10 +5,12 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
 import '../shared/contracts/app_contracts.dart';
 import '../features/auth/data/mock_auth_repository.dart';
 import '../features/account/data/mock_account_repository.dart';
+import '../features/swap/data/dio_swap_repository.dart';
 import '../features/swap/data/mock_swap_repository.dart';
 import '../features/wallet/data/evm_chain_repo_impl.dart';
 import '../features/wallet/data/mock_evm_chain_repository.dart';
@@ -41,7 +43,38 @@ Future<void> bootstrap() async {
         authRepositoryProvider.overrideWith((ref) => MockAuthRepository(ref)),
         accountRepositoryProvider
             .overrideWith((ref) => MockAccountRepository()),
-        swapRepositoryProvider.overrideWith((ref) => MockSwapRepository()),
+        swapRepositoryProvider.overrideWith((ref) {
+          final baseUrl = swapApiBaseUrl.trim();
+          if (baseUrl.isEmpty) return MockSwapRepository();
+
+          final dio = Dio(
+            BaseOptions(
+              baseUrl: baseUrl,
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 20),
+              sendTimeout: const Duration(seconds: 20),
+              headers: const <String, dynamic>{
+                'Accept': 'application/json',
+              },
+            ),
+          );
+
+          dio.interceptors.add(
+            InterceptorsWrapper(
+              onRequest: (options, handler) {
+                final session = ref.read(authSessionProvider);
+                final token = session.accessToken;
+                if (token != null && token.isNotEmpty) {
+                  options.headers['Authorization'] = 'Bearer $token';
+                }
+                handler.next(options);
+              },
+            ),
+          );
+
+          ref.onDispose(dio.close);
+          return DioSwapRepository(dio);
+        }),
         evmChainRepositoryProvider.overrideWith((ref) {
           final network = ref.watch(selectedNetworkProvider);
           final rpcUrl = network.rpcUrl.trim();

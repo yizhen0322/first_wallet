@@ -1,30 +1,125 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/router.dart';
+import '../../../shared/contracts/app_contracts.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/eth_format.dart';
 import '../../wallet/state/evm_balance.dart';
-import '../../wallet/state/wallet_state.dart';
+import '../../wallet/state/wallet_secrets.dart';
+import '../state/swap_quote.dart';
 import '../state/swap_state.dart';
+import '../state/swap_tokens.dart';
 
-class SwapMainScreen extends ConsumerWidget {
+class SwapMainScreen extends ConsumerStatefulWidget {
   const SwapMainScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SwapMainScreen> createState() => _SwapMainScreenState();
+}
+
+class _SwapMainScreenState extends ConsumerState<SwapMainScreen> {
+  final _amountCtrl = TextEditingController();
+
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _amountCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickToken({
+    required bool isFrom,
+    required List<SwapToken> tokens,
+  }) async {
+    final picked = await showModalBottomSheet<SwapToken>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(12),
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Select Token',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            ...tokens.map(
+              (t) => ListTile(
+                title: Text(
+                  t.symbol,
+                  style: const TextStyle(color: AppColors.textPrimary),
+                ),
+                subtitle: Text(
+                  t.isNative ? 'Native' : t.address,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.of(ctx).pop(t),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || picked == null) return;
+
+    final c = ref.read(swapFormProvider.notifier);
+    if (isFrom) {
+      c.setFromToken(
+        address: picked.address,
+        symbol: picked.symbol,
+        decimals: picked.decimals,
+      );
+    } else {
+      c.setToToken(
+        address: picked.address,
+        symbol: picked.symbol,
+        decimals: picked.decimals,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final form = ref.watch(swapFormProvider);
-    final assets = ref.watch(walletAssetsProvider);
+    final mnemonic = ref.watch(currentMnemonicProvider);
+    final session = ref.watch(walletSessionProvider);
+    final canSign =
+        (mnemonic != null && mnemonic.trim().isNotEmpty) && session.isUnlocked;
+
     final balanceAsync = ref.watch(evmNativeBalanceWeiProvider);
-    final fromAsset = assets.firstWhere((a) => a.symbol == form.fromSymbol,
-        orElse: () => assets[0]);
-    final toAsset = assets.firstWhere((a) => a.symbol == form.toSymbol,
-        orElse: () => assets[1]);
+    final quoteAsync = ref.watch(swapQuoteProvider);
+    final tokensAsync = ref.watch(swapTokensProvider);
+
+    if (_amountCtrl.text != form.amount) {
+      _amountCtrl.text = form.amount;
+      _amountCtrl.selection =
+          TextSelection.collapsed(offset: _amountCtrl.text.length);
+    }
 
     final balanceText = balanceAsync.when(
-      data: (wei) =>
-          'Available: ${formatWeiToEth(wei, maxFractionDigits: 6)} ETH',
-      loading: () => 'Loading balance…',
+      data: (wei) => 'Available: ${formatWeiToEth(wei, maxFractionDigits: 6)} ETH',
+      loading: () => 'Loading balance...',
       error: (_, __) => 'Balance unavailable',
     );
 
@@ -43,10 +138,8 @@ class SwapMainScreen extends ConsumerWidget {
         actions: [
           IconButton(
             tooltip: 'Swap Settings',
-            onPressed: () =>
-                Navigator.of(context).pushNamed(AppRoutes.swapSettings),
-            icon: const Icon(Icons.settings_outlined,
-                color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.swapSettings),
+            icon: const Icon(Icons.settings_outlined, color: AppColors.textPrimary),
           ),
         ],
       ),
@@ -54,66 +147,121 @@ class SwapMainScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _TokenCard(
-              label: 'You Pay',
-              symbol: fromAsset.symbol,
-              amount: form.amount,
-              onSymbolTap: () {},
-              onAmountChanged: (v) =>
-                  ref.read(swapFormProvider.notifier).setAmount(v),
-              helperText: balanceText,
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 48,
-                height: 48,
+            if (!canSign)
+              Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary,
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border, width: 0.5),
                 ),
-                child: IconButton(
-                  onPressed: () => ref.read(swapFormProvider.notifier).flip(),
-                  icon: const Icon(Icons.swap_vert, color: Colors.black),
+                child: const Text(
+                  'Watch-only wallet: swapping is disabled.',
+                  style: TextStyle(color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            _TokenCard(
-              label: 'You Get',
-              symbol: toAsset.symbol,
-              amount: '0',
-              onSymbolTap: () {},
-              enabledAmount: false,
-              helperText: 'Estimated',
+            if (!canSign) const SizedBox(height: 12),
+            tokensAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text(
+                'Failed to load tokens: $e',
+                style: const TextStyle(color: AppColors.error),
+              ),
+              data: (tokens) => Column(
+                children: [
+                  _TokenCard(
+                    label: 'You Pay',
+                    symbol: form.fromSymbol,
+                    controller: _amountCtrl,
+                    enabledAmount: canSign,
+                    helperText: balanceText,
+                    onSymbolTap: () => _pickToken(isFrom: true, tokens: tokens),
+                    onAmountChanged: (v) {
+                      _debounce?.cancel();
+                      _debounce = Timer(const Duration(milliseconds: 250), () {
+                        ref.read(swapFormProvider.notifier).setAmount(v.trim());
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary,
+                      ),
+                      child: IconButton(
+                        onPressed: canSign
+                            ? () => ref.read(swapFormProvider.notifier).flip()
+                            : null,
+                        icon: const Icon(Icons.swap_vert, color: Colors.black),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _TokenCard(
+                    label: 'You Get',
+                    symbol: form.toSymbol,
+                    controller: TextEditingController(
+                      text: quoteAsync.maybeWhen(
+                        data: (q) => _formatFromSmallestUnit(
+                          q.amountOut,
+                          form.toDecimals,
+                        ),
+                        orElse: () => '',
+                      ),
+                    ),
+                    enabledAmount: false,
+                    helperText: quoteAsync.maybeWhen(
+                      loading: () => 'Estimating…',
+                      data: (_) => 'Estimated',
+                      orElse: () => 'Estimated',
+                    ),
+                    onSymbolTap: () => _pickToken(isFrom: false, tokens: tokens),
+                    onAmountChanged: null,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border, width: 0.5),
+            _DexCard(),
+            const SizedBox(height: 16),
+            quoteAsync.when(
+              loading: () => const SizedBox.shrink(),
+              error: (e, _) => Text(
+                e.toString(),
+                style: const TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
               ),
-              child: ListTile(
-                title: const Text(
-                  'DEX',
-                  style: TextStyle(color: AppColors.textPrimary),
-                ),
-                subtitle: Text(
-                  form.dex,
-                  style: const TextStyle(color: AppColors.textSecondary),
-                ),
-                trailing: const Icon(Icons.chevron_right,
-                    color: AppColors.textSecondary),
-                onTap: () => Navigator.of(context).pushNamed(AppRoutes.swapDex),
+              data: (q) => Column(
+                children: [
+                  if (q.warnings.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: AppColors.border, width: 0.5),
+                      ),
+                      child: Text(
+                        q.warnings.join('\n'),
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
             SizedBox(
               height: 56,
               child: FilledButton(
-                onPressed: () =>
-                    Navigator.of(context).pushNamed(AppRoutes.swapConfirm),
+                onPressed: canSign
+                    ? () => Navigator.of(context).pushNamed(AppRoutes.swapConfirm)
+                    : null,
                 child: const Text('Swap'),
               ),
             ),
@@ -124,20 +272,47 @@ class SwapMainScreen extends ConsumerWidget {
   }
 }
 
+class _DexCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final form = ref.watch(swapFormProvider);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border, width: 0.5),
+      ),
+      child: ListTile(
+        title: const Text(
+          'DEX',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        subtitle: Text(
+          form.dex,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        trailing:
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+        onTap: () => Navigator.of(context).pushNamed(AppRoutes.swapDex),
+      ),
+    );
+  }
+}
+
 class _TokenCard extends StatelessWidget {
   const _TokenCard({
     required this.label,
     required this.symbol,
-    required this.amount,
+    required this.controller,
     required this.onSymbolTap,
-    this.onAmountChanged,
+    required this.onAmountChanged,
     this.enabledAmount = true,
     this.helperText,
   });
 
   final String label;
   final String symbol;
-  final String amount;
+  final TextEditingController controller;
   final VoidCallback onSymbolTap;
   final ValueChanged<String>? onAmountChanged;
   final bool enabledAmount;
@@ -181,7 +356,7 @@ class _TokenCard extends StatelessWidget {
             children: [
               Expanded(
                 child: TextField(
-                  controller: TextEditingController(text: amount),
+                  controller: controller,
                   enabled: enabledAmount,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
@@ -214,4 +389,19 @@ class _TokenCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatFromSmallestUnit(String raw, int decimals) {
+  final v = BigInt.tryParse(raw) ?? BigInt.zero;
+  if (v == BigInt.zero) return '0';
+
+  final divisor = BigInt.from(10).pow(decimals);
+  final whole = v ~/ divisor;
+  final remainder = v % divisor;
+  if (remainder == BigInt.zero) return whole.toString();
+
+  final remainderStr = remainder.toString().padLeft(decimals, '0');
+  final trimmed = remainderStr.replaceAll(RegExp(r'0+$'), '');
+  final shown = trimmed.length > 6 ? trimmed.substring(0, 6) : trimmed;
+  return '$whole.$shown';
 }

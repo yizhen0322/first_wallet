@@ -47,5 +47,7 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan QR codes to fill wallet addresses.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Authenticate to view sensitive wallet information.</string>
 </dict>
 </plist>

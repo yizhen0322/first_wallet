@@ -25,8 +25,13 @@ class TransactionDetailsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOutgoing = !transaction.isIncoming;
-    final isSuccess = !transaction.isError;
-    final statusColor = isSuccess ? Colors.green : AppColors.error;
+    final isPending = transaction.isPending;
+    final isSuccess = !transaction.isError && !isPending;
+    final statusColor = isPending
+        ? AppColors.textSecondary
+        : isSuccess
+            ? Colors.green
+            : AppColors.error;
     final dateFormat = DateFormat('MMM d, yyyy HH:mm');
 
     return Scaffold(
@@ -77,14 +82,18 @@ class TransactionDetailsScreen extends StatelessWidget {
                   Text(
                     '${isOutgoing ? '-' : '+'}${transaction.valueInEth} ETH',
                     style: TextStyle(
-                      color: isOutgoing ? AppColors.error : Colors.green,
+                      color: isPending
+                          ? AppColors.textSecondary
+                          : isOutgoing
+                              ? AppColors.error
+                              : Colors.green,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    isSuccess ? 'Confirmed' : 'Failed',
+                    isPending ? 'Pending' : (isSuccess ? 'Confirmed' : 'Failed'),
                     style: TextStyle(
                       color: statusColor,
                       fontSize: 14,
@@ -107,7 +116,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                 children: [
                   _DetailRow(
                     label: 'Status',
-                    value: isSuccess ? 'Success' : 'Failed',
+                    value: isPending ? 'Pending' : (isSuccess ? 'Success' : 'Failed'),
                     valueColor: statusColor,
                   ),
                   const Divider(height: 24, color: AppColors.border),

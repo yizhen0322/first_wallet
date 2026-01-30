@@ -10,14 +10,16 @@ import 'wallet_secrets.dart';
 class WalletAsset {
   final String symbol;
   final String name;
-  final double priceUsd;
+  final double price; // Dynamic price based on selected currency
   final double changePct;
+  final String currency; // ISO code, e.g. "USD", "MYR"
 
   const WalletAsset({
     required this.symbol,
     required this.name,
-    required this.priceUsd,
+    required this.price,
     required this.changePct,
+    this.currency = 'USD',
   });
 }
 
@@ -124,15 +126,35 @@ final walletAssetsProvider = Provider<List<WalletAsset>>((ref) {
   // Matches the coins shown in the Figma export.
   return const [
     WalletAsset(
-        symbol: 'ETH', name: 'Ethereum', priceUsd: 2345.6, changePct: 1.25),
+        symbol: 'ETH',
+        name: 'Ethereum',
+        price: 2345.6,
+        changePct: 1.25,
+        currency: 'USD'),
     WalletAsset(
-        symbol: 'BTC', name: 'Bitcoin', priceUsd: 32567.7, changePct: 2.30),
+        symbol: 'BTC',
+        name: 'Bitcoin',
+        price: 32567.7,
+        changePct: 2.30,
+        currency: 'USD'),
     WalletAsset(
-        symbol: 'DCR', name: 'Decred', priceUsd: 43567.7, changePct: 7.80),
+        symbol: 'DCR',
+        name: 'Decred',
+        price: 43567.7,
+        changePct: 7.80,
+        currency: 'USD'),
     WalletAsset(
-        symbol: 'EMC', name: 'Emercoin', priceUsd: 13567.7, changePct: -4.30),
+        symbol: 'EMC',
+        name: 'Emercoin',
+        price: 13567.7,
+        changePct: -4.30,
+        currency: 'USD'),
     WalletAsset(
-        symbol: 'NAV', name: 'NavCoin', priceUsd: 12567.7, changePct: 6.13),
+        symbol: 'NAV',
+        name: 'NavCoin',
+        price: 12567.7,
+        changePct: 6.13,
+        currency: 'USD'),
   ];
 });
 

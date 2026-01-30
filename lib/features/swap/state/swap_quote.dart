@@ -14,11 +14,13 @@ final swapQuoteProvider = FutureProvider.autoDispose<SwapQuoteResponse>((ref) as
     throw Exception('Wallet not initialized');
   }
 
+  final amountIn = _parseAmountToSmallestUnit(form.amount, form.fromDecimals);
+
   final req = SwapQuoteRequest(
     chainId: network.chainId,
-    fromToken: form.fromSymbol,
-    toToken: form.toSymbol,
-    amountIn: form.amount,
+    fromToken: form.fromToken,
+    toToken: form.toToken,
+    amountIn: amountIn.toString(),
     taker: taker,
     slippageBps: (form.slippage * 100).round(),
     preferredDex: form.dex,
@@ -37,4 +39,33 @@ String requireMnemonic(WidgetRef ref) {
     throw Exception('Wallet mnemonic missing');
   }
   return m;
+}
+
+BigInt _parseAmountToSmallestUnit(String input, int decimals) {
+  final v = input.trim();
+  if (v.isEmpty) throw Exception('Enter amount');
+
+  // Allow "1", "1.", ".1", "1.23". Disallow negatives, multiple dots, letters.
+  if (!RegExp(r'^\d*\.?\d*$').hasMatch(v) || v == '.') {
+    throw Exception('Invalid amount');
+  }
+
+  final parts = v.split('.');
+  final wholePart = parts[0].isEmpty ? '0' : parts[0];
+  var fractionalPart = parts.length > 1 ? parts[1] : '';
+
+  if (fractionalPart.length > decimals) {
+    fractionalPart = fractionalPart.substring(0, decimals);
+  } else {
+    fractionalPart = fractionalPart.padRight(decimals, '0');
+  }
+
+  final combined = '$wholePart$fractionalPart';
+  final normalized = combined.replaceFirst(RegExp(r'^0+'), '');
+  if (normalized.isEmpty) return BigInt.zero;
+  try {
+    return BigInt.parse(normalized);
+  } catch (_) {
+    throw Exception('Invalid amount');
+  }
 }

@@ -244,14 +244,24 @@ class _TransactionTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: tx.isIncoming
-                    ? AppColors.success.withValues(alpha: 38)
-                    : AppColors.error.withValues(alpha: 38),
+                color: tx.isPending
+                    ? AppColors.textSecondary.withValues(alpha: 38)
+                    : tx.isIncoming
+                        ? AppColors.success.withValues(alpha: 38)
+                        : AppColors.error.withValues(alpha: 38),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(
-                tx.isIncoming ? Icons.arrow_downward : Icons.arrow_upward,
-                color: tx.isIncoming ? AppColors.success : AppColors.error,
+                tx.isPending
+                    ? Icons.access_time
+                    : tx.isIncoming
+                        ? Icons.arrow_downward
+                        : Icons.arrow_upward,
+                color: tx.isPending
+                    ? AppColors.textSecondary
+                    : tx.isIncoming
+                        ? AppColors.success
+                        : AppColors.error,
                 size: 20,
               ),
             ),
@@ -262,7 +272,11 @@ class _TransactionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tx.isIncoming ? 'Received' : 'Sent',
+                    tx.isPending
+                        ? 'Pending'
+                        : tx.isIncoming
+                            ? 'Received'
+                            : 'Sent',
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 15,

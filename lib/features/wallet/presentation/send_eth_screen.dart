@@ -6,10 +6,12 @@ import 'package:web3dart/web3dart.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/eth_format.dart';
 import '../data/address_book_repository.dart';
+import '../data/market_data_provider.dart';
 import '../state/evm_balance.dart';
 import 'address_book_screen.dart';
 import 'qr_scanner_screen.dart';
 import 'send_eth_confirm_screen.dart';
+import '../../shared/currency/currency_provider.dart';
 
 class SendEthScreen extends ConsumerStatefulWidget {
   const SendEthScreen({super.key});
@@ -32,6 +34,19 @@ class _SendEthScreenState extends ConsumerState<SendEthScreen> {
   @override
   Widget build(BuildContext context) {
     final balanceAsync = ref.watch(evmNativeBalanceWeiProvider);
+    final marketAsync = ref.watch(marketDataProvider);
+    final currency = ref.watch(currencyProvider);
+
+    double? ethPrice;
+    final market = marketAsync.asData?.value;
+    if (market != null) {
+      for (final a in market) {
+        if (a.symbol.toUpperCase() == 'ETH') {
+          ethPrice = a.price;
+          break;
+        }
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -112,6 +127,8 @@ class _SendEthScreenState extends ConsumerState<SendEthScreen> {
             _AmountBox(
               controller: _amountCtrl,
               onClear: _amountCtrl.clear,
+              ethPrice: ethPrice,
+              currencySymbol: currency.symbol,
             ),
             const SizedBox(height: 16),
             TextField(
@@ -255,15 +272,22 @@ class _SendEthScreenState extends ConsumerState<SendEthScreen> {
 }
 
 class _AmountBox extends StatelessWidget {
-  const _AmountBox({required this.controller, required this.onClear});
+  const _AmountBox({
+    required this.controller,
+    required this.onClear,
+    required this.ethPrice,
+    required this.currencySymbol,
+  });
 
   final TextEditingController controller;
   final VoidCallback onClear;
+  final double? ethPrice;
+  final String currencySymbol;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.background,
         borderRadius: BorderRadius.circular(14),
@@ -271,58 +295,97 @@ class _AmountBox extends StatelessWidget {
       ),
       child: Stack(
         alignment: Alignment.center,
+        clipBehavior: Clip.none,
         children: [
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: '0',
-                        hintStyle: TextStyle(color: AppColors.textSecondary),
+              SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          hintText: '0',
+                          hintStyle: TextStyle(color: AppColors.textSecondary),
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: AppColors.textPrimary),
-                    onPressed: onClear,
-                  ),
-                ],
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.textPrimary,
+                      ),
+                      onPressed: onClear,
+                    ),
+                  ],
+                ),
               ),
               const Divider(
                 height: 1,
                 thickness: 1,
                 color: AppColors.primary,
               ),
-              const SizedBox(height: 10),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '\$0.00',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+              SizedBox(
+                height: 44,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: controller,
+                        builder: (context, value, _) {
+                          final amount = double.tryParse(value.text.trim());
+                          final price = ethPrice;
+                          final usd = (amount != null && price != null)
+                              ? amount * price
+                              : null;
+                          final text = usd == null
+                              ? '${currencySymbol}0.00'
+                              : '$currencySymbol${usd.toStringAsFixed(2)}';
+                          return Text(
+                            text,
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 48), // symmetry with IconButton
+                  ],
                 ),
               ),
             ],
           ),
-          const IgnorePointer(
-            child: Icon(Icons.swap_vert, color: AppColors.primary),
+          IgnorePointer(
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.primary, width: 1),
+              ),
+              child: const Icon(
+                Icons.swap_vert,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
           ),
         ],
       ),

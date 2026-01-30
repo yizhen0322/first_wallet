@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/contracts/app_contracts.dart';
+import '../../../shared/data/local_tx_store.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../state/evm_balance.dart';
 
@@ -50,6 +51,17 @@ class _TxStatusScreenState extends ConsumerState<TxStatusScreen> {
         setState(() => _receipt = receipt);
         _timer?.cancel();
         ref.invalidate(evmNativeBalanceWeiProvider);
+        final session = ref.read(walletSessionProvider);
+        final address = session.activeAddress;
+        final network = ref.read(selectedNetworkProvider);
+        if (address != null && address.isNotEmpty) {
+          await ref.read(localTxStoreProvider).markStatus(
+                chainId: network.chainId,
+                address: address,
+                hash: widget.txHash,
+                status: receipt.success ? LocalTxStatus.success : LocalTxStatus.failed,
+              );
+        }
       }
     } catch (e) {
       if (!mounted) return;

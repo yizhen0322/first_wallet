@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
+import '../../shared/currency/currency_provider.dart';
 import '../state/wallet_state.dart';
 
 /// CoinGecko API IDs for the coins we display
@@ -34,12 +35,15 @@ final marketDataProvider =
   );
   ref.onDispose(timer.cancel);
 
+  final currency = ref.watch(currencyProvider);
+  final currencyCode = currency.code.toLowerCase();
+
   try {
     final ids = _coinIds.values.join(',');
     final uri = Uri.parse(
       'https://api.coingecko.com/api/v3/simple/price'
       '?ids=$ids'
-      '&vs_currencies=usd'
+      '&vs_currencies=$currencyCode'
       '&include_24hr_change=true',
     );
 
@@ -58,14 +62,16 @@ final marketDataProvider =
       final coinData = data[coinId];
 
       if (coinData != null) {
-        final price = (coinData['usd'] as num?)?.toDouble() ?? 0.0;
-        final change = (coinData['usd_24h_change'] as num?)?.toDouble() ?? 0.0;
+        final price = (coinData[currencyCode] as num?)?.toDouble() ?? 0.0;
+        final change =
+            (coinData['${currencyCode}_24h_change'] as num?)?.toDouble() ?? 0.0;
 
         assets.add(WalletAsset(
           symbol: symbol,
           name: _coinNames[symbol] ?? symbol,
-          priceUsd: price,
+          price: price,
           changePct: change,
+          currency: currency.code,
         ));
       }
     }
@@ -78,12 +84,37 @@ final marketDataProvider =
     return assets;
   } catch (e) {
     // Fallback to mock data on error
-    return const [
-      WalletAsset(symbol: 'ETH', name: 'Ethereum', priceUsd: 0, changePct: 0),
-      WalletAsset(symbol: 'BTC', name: 'Bitcoin', priceUsd: 0, changePct: 0),
-      WalletAsset(symbol: 'DCR', name: 'Decred', priceUsd: 0, changePct: 0),
-      WalletAsset(symbol: 'EMC', name: 'Emercoin', priceUsd: 0, changePct: 0),
-      WalletAsset(symbol: 'NAV', name: 'NavCoin', priceUsd: 0, changePct: 0),
+    return [
+      WalletAsset(
+          symbol: 'ETH',
+          name: 'Ethereum',
+          price: 0,
+          changePct: 0,
+          currency: currency.code),
+      WalletAsset(
+          symbol: 'BTC',
+          name: 'Bitcoin',
+          price: 0,
+          changePct: 0,
+          currency: currency.code),
+      WalletAsset(
+          symbol: 'DCR',
+          name: 'Decred',
+          price: 0,
+          changePct: 0,
+          currency: currency.code),
+      WalletAsset(
+          symbol: 'EMC',
+          name: 'Emercoin',
+          price: 0,
+          changePct: 0,
+          currency: currency.code),
+      WalletAsset(
+          symbol: 'NAV',
+          name: 'NavCoin',
+          price: 0,
+          changePct: 0,
+          currency: currency.code),
     ];
   }
 });

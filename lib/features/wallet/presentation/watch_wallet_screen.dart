@@ -180,7 +180,7 @@ class _WatchWalletScreenState extends ConsumerState<WatchWalletScreen> {
 
       // Update wallet session with the watched address
       ref.read(walletSessionProvider.notifier).state = WalletSession(
-        isUnlocked: true,
+        isUnlocked: false,
         activeAddress: address,
       );
 

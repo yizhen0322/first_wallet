@@ -91,6 +91,11 @@ const String _defaultMainnetRpcUrl = String.fromEnvironment(
   defaultValue: '',
 );
 
+const String swapApiBaseUrl = String.fromEnvironment(
+  'SWAP_API_BASE_URL',
+  defaultValue: '',
+);
+
 final availableNetworksProvider = Provider<List<ChainConfig>>((ref) {
   return const [
     ChainConfig(

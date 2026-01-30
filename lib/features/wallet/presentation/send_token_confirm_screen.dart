@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/contracts/app_contracts.dart';
+import '../../../shared/data/local_tx_store.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../../../shared/utils/eth_format.dart';
 import '../../activity/data/token_balance_provider.dart';
@@ -370,6 +371,13 @@ class _SendTokenConfirmScreenState
           );
 
       final txHash = await repo.sendRawTx(signedRaw);
+      await ref.read(localTxStoreProvider).addOutgoing(
+            chainId: network.chainId,
+            from: from,
+            to: widget.to,
+            hash: txHash,
+            valueWei: widget.amountRaw.toString(),
+          );
 
       // Invalidate balances
       ref.invalidate(evmNativeBalanceWeiProvider);

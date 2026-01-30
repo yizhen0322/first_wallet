@@ -5,6 +5,7 @@ import '../../../app/router.dart';
 import '../../../shared/theme/app_theme.dart';
 import '../data/market_data_provider.dart';
 import 'network_list_screen.dart';
+import '../../shared/currency/currency_provider.dart';
 
 class ReceiveScreen extends ConsumerStatefulWidget {
   const ReceiveScreen({super.key});
@@ -18,7 +19,16 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
+  }
+
+  final _lifecycleObserver = _SimpleLifecycleObserver();
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -43,6 +53,12 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final assetsAsync = ref.watch(marketDataProvider);
+    final currency = ref.watch(currencyProvider);
+
+    _lifecycleObserver.onResumed = () {
+      if (!mounted) return;
+      ref.invalidate(marketDataProvider);
+    };
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -123,88 +139,97 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
                     );
                   }
 
-                  return ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      ...filtered.map(
-                        (a) => Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(14),
-                            border:
-                                Border.all(color: AppColors.border, width: 0.5),
-                          ),
-                          child: ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _getAssetColor(a.symbol),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  a.symbol[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
+                  return RefreshIndicator(
+                    color: AppColors.primary,
+                    backgroundColor: AppColors.surface,
+                    onRefresh: () async {
+                      ref.invalidate(marketDataProvider);
+                      await ref.read(marketDataProvider.future);
+                    },
+                    child: ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: [
+                        ...filtered.map(
+                          (a) => Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                  color: AppColors.border, width: 0.5),
+                            ),
+                            child: ListTile(
+                              leading: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _getAssetColor(a.symbol),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    a.symbol[0].toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            title: Text(
-                              a.name,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
+                              title: Text(
+                                a.name,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            subtitle: Text(
-                              a.symbol,
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary),
-                            ),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '\$${a.priceUsd.toStringAsFixed(1)}',
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
+                              subtitle: Text(
+                                a.symbol,
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary),
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${currency.symbol}${a.price.toStringAsFixed(1)}',
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${a.changePct >= 0 ? '+' : ''}${a.changePct.toStringAsFixed(2)}%',
-                                  style: TextStyle(
-                                    color: a.changePct >= 0
-                                        ? Colors.green[400]
-                                        : Colors.red[400],
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${a.changePct >= 0 ? '+' : ''}${a.changePct.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      color: a.changePct >= 0
+                                          ? Colors.green[400]
+                                          : Colors.red[400],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            onTap: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => NetworkListScreen(
-                                  onSelected: (context, _) {
-                                    Navigator.of(context).pushReplacementNamed(
-                                        AppRoutes.receiveAddress);
-                                  },
+                                ],
+                              ),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => NetworkListScreen(
+                                    onSelected: (context, _) {
+                                      Navigator.of(context)
+                                          .pushReplacementNamed(
+                                              AppRoutes.receiveAddress);
+                                    },
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               ),
@@ -257,5 +282,16 @@ class _ReceiveScreenState extends ConsumerState<ReceiveScreen> {
         ],
       ),
     );
+  }
+}
+
+class _SimpleLifecycleObserver with WidgetsBindingObserver {
+  VoidCallback? onResumed;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      onResumed?.call();
+    }
   }
 }

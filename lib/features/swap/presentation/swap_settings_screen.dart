@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/theme/app_theme.dart';
+import '../../wallet/presentation/qr_scanner_screen.dart';
 import '../state/swap_state.dart';
 
 class SwapSettingsScreen extends ConsumerStatefulWidget {
@@ -23,9 +24,13 @@ class _SwapSettingsScreenState extends ConsumerState<SwapSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final form = ref.watch(swapFormProvider);
-    _recipientCtrl.text = form.recipient;
+    if (_recipientCtrl.text != form.recipient) {
+      _recipientCtrl.text = form.recipient;
+      _recipientCtrl.selection =
+          TextSelection.collapsed(offset: _recipientCtrl.text.length);
+    }
 
-    final options = const [0.5, 0.1, 0.5, 1.0, 3.0];
+    final options = const [0.1, 0.5, 1.0, 3.0];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,7 +66,16 @@ class _SwapSettingsScreenState extends ConsumerState<SwapSettingsScreen> {
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.qr_code_scanner,
                       color: AppColors.textSecondary),
-                  onPressed: () {},
+                  onPressed: () async {
+                    final scanned = await Navigator.of(context).push<String>(
+                      MaterialPageRoute(
+                        builder: (_) => const QrScannerScreen(),
+                      ),
+                    );
+                    final v = scanned?.trim();
+                    if (v == null || v.isEmpty) return;
+                    ref.read(swapFormProvider.notifier).setRecipient(v);
+                  },
                 ),
               ),
               onChanged: (v) =>
